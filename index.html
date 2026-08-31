@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Autonomous ML Research Triage</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Machine Learning Research Model</p>
+            <h1>Autonomous Research Triage</h1>
+          </div>
+          <div id="model-status" class="status-pill">
+            <span class="pulse"></span>
+            Local model ready
+          </div>
+        </header>
+
+        <section class="input-panel" aria-labelledby="problem-label">
+          <div class="panel-heading">
+            <div>
+              <h2 id="problem-label">Research problem</h2>
+              <p>Paste a problem statement and let the agent detect requirements, retrain, classify, and plan.</p>
+            </div>
+            <button id="sample-button" type="button">Load sample</button>
+          </div>
+
+          <textarea id="problem-input" spellcheck="true">
+We need an autonomous system that reviews agent run logs, detects failures or policy risks, explains which evidence caused the decision, and recommends the next investigation steps for the engineering team.
+          </textarea>
+
+          <div class="actions">
+            <button id="analyze-button" type="button">Analyze & train</button>
+            <button id="clear-button" type="button" class="secondary">Clear</button>
+          </div>
+        </section>
+
+        <section class="agent-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Autonomous requirement detection</h2>
+              <p id="agent-summary">Run analysis to extract requirements from the problem statement.</p>
+            </div>
+            <span id="agent-source" class="source-badge">Waiting</span>
+          </div>
+          <div class="requirement-grid">
+            <article>
+              <p class="card-label">Detected requirements</p>
+              <ul id="requirement-list" class="compact-list"></ul>
+            </article>
+            <article>
+              <p class="card-label">Generated training examples</p>
+              <ul id="training-list" class="compact-list"></ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="results-grid">
+          <article class="result-card primary">
+            <p class="card-label">Predicted research type</p>
+            <h2 id="prediction">-</h2>
+            <div class="confidence">
+              <div>
+                <span id="confidence-label">0%</span>
+                confidence
+              </div>
+              <div class="meter" aria-hidden="true">
+                <span id="confidence-bar"></span>
+              </div>
+            </div>
+          </article>
+
+          <article class="result-card">
+            <p class="card-label">Why the model decided this</p>
+            <ul id="evidence-list" class="evidence-list"></ul>
+          </article>
+
+          <article class="result-card">
+            <p class="card-label">Autonomous next actions</p>
+            <ol id="plan-list" class="plan-list"></ol>
+          </article>
+        </section>
+
+        <section class="model-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Model comparison</h2>
+              <p id="training-note">Scores come from a lightweight multinomial Naive Bayes classifier trained on local examples.</p>
+            </div>
+          </div>
+          <div id="scoreboard" class="scoreboard" aria-label="Category score comparison"></div>
+        </section>
+      </section>
+
+      <aside class="side-panel">
+        <section>
+          <p class="eyebrow">Project story</p>
+          <h2>What this solves</h2>
+          <p>
+            Research teams waste time deciding which ML path fits a vague problem. This agent uses requirement
+            detection to expand the training set, then turns the problem into a classified direction and plan.
+          </p>
+        </section>
+
+        <section>
+          <h2>Demo flow</h2>
+          <ul class="demo-list">
+            <li>Paste a new problem statement.</li>
+            <li>Run requirement detection and automatic model training.</li>
+            <li>Show detected requirements, evidence terms, and category scores.</li>
+            <li>Use the generated plan as the next sprint checklist.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Research categories</h2>
+          <div id="category-tags" class="tag-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="src/app.js"></script>
+  </body>
+</html>
