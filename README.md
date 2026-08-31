@@ -59,3 +59,15 @@ Research teams often lose time deciding which ML method best fits a vague proble
 - Track evaluation metrics on a held-out test set.
 - Add retrieval over research papers or internal documentation.
 - Export the generated plan as a project checklist.
+
+## Literature-backed competition strategy
+
+See [docs/literature_strategy.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/literature_strategy.md) for the recommended pivot into **AutoScaleRec**, an autonomous scalable recommender research agent for KuaiRand-Pure.
+
+See [docs/kuairand_starter_kit_test_report.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/kuairand_starter_kit_test_report.md) for the starter-kit zip smoke test results.
+
+See [docs/multi_model_framework.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/multi_model_framework.md) for the four-model autonomous learning framework.
+
+See [docs/current_project_review.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/current_project_review.md) for a critical review of what is strong today and what still needs to become real benchmark work.
+
+See [docs/aide_integration_plan.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/aide_integration_plan.md) for how the project adapts AIDE-style solution-space tree search.

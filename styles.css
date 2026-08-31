@@ -138,6 +138,7 @@ p {
 
 .input-panel,
 .agent-panel,
+.loop-panel,
 .model-panel,
 .result-card,
 .side-panel section {
@@ -149,6 +150,7 @@ p {
 
 .input-panel,
 .agent-panel,
+.loop-panel,
 .model-panel {
   padding: 1rem;
 }
@@ -259,6 +261,64 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
+}
+
+.pipeline-stages {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.stage-card {
+  background: #fbfcfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto 1fr;
+  min-height: 190px;
+  padding: 0.85rem;
+}
+
+.stage-index {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 900;
+  height: 1.8rem;
+  justify-content: center;
+  width: 1.8rem;
+}
+
+.stage-card h3 {
+  font-size: 0.96rem;
+  line-height: 1.2;
+  margin: 0 0 0.25rem;
+}
+
+.stage-card p {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  margin-bottom: 0.45rem;
+}
+
+.stage-card .stage-role {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.stage-card span {
+  background: #edf3f6;
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 0.35rem 0.5rem;
 }
 
 .requirement-grid article {
@@ -384,6 +444,122 @@ textarea:focus {
   height: 100%;
 }
 
+.loop-panel {
+  margin-top: 1rem;
+}
+
+.metrics-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.metrics-grid article {
+  background: #fbfcfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.metrics-grid span {
+  color: var(--rose);
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 900;
+}
+
+.metrics-grid p {
+  font-size: 0.78rem;
+  font-weight: 900;
+  margin-bottom: 0;
+  text-transform: uppercase;
+}
+
+.iteration-log {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.iteration-card {
+  background: #fbfcfd;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--blue);
+  border-radius: 8px;
+  padding: 0.9rem;
+}
+
+.iteration-card.kept {
+  border-left-color: var(--teal);
+}
+
+.iteration-card.rejected {
+  border-left-color: var(--amber);
+}
+
+.iteration-head {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.iteration-head h3 {
+  font-size: 0.98rem;
+  margin: 0;
+}
+
+.iteration-card p {
+  margin-bottom: 0.35rem;
+}
+
+.iteration-card code {
+  background: #edf3f6;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.tree-section {
+  margin-top: 1rem;
+}
+
+.solution-tree {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tree-node {
+  background: #fbfcfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.8rem;
+}
+
+.tree-node.best {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px var(--teal-soft);
+}
+
+.tree-node h3 {
+  font-size: 0.94rem;
+  margin: 0 0 0.3rem;
+}
+
+.tree-node p {
+  font-size: 0.84rem;
+  margin-bottom: 0.35rem;
+}
+
+.tree-node span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .side-panel {
   display: grid;
   align-content: start;
@@ -422,6 +598,18 @@ textarea:focus {
   .requirement-grid {
     grid-template-columns: 1fr;
   }
+
+  .pipeline-stages {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .solution-tree {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 620px) {
@@ -438,5 +626,17 @@ textarea:focus {
 
   button {
     width: 100%;
+  }
+
+  .pipeline-stages {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .solution-tree {
+    grid-template-columns: 1fr;
   }
 }

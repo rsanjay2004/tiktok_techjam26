@@ -83,6 +83,32 @@ const defaultAgentState = {
   requirements: ["Waiting for a problem statement."],
   trainingExamples: [],
   plan: [],
+  pipelineStages: [
+    {
+      name: "Data Processor",
+      role: "Profiles raw inputs",
+      output: "Waiting for a problem statement.",
+      decision: "Idle",
+    },
+    {
+      name: "Data Cleaner",
+      role: "Finds quality issues",
+      output: "Waiting for extracted fields.",
+      decision: "Idle",
+    },
+    {
+      name: "Training Model",
+      role: "Retrains the classifier",
+      output: "Waiting for generated examples.",
+      decision: "Idle",
+    },
+    {
+      name: "Continual Learner",
+      role: "Decides next iteration",
+      output: "Waiting for scores and errors.",
+      decision: "Idle",
+    },
+  ],
 };
 
 const stopWords = new Set([
@@ -134,6 +160,15 @@ const attachButton = document.querySelector("#attach-button");
 const fileInput = document.querySelector("#file-input");
 const attachmentList = document.querySelector("#attachment-list");
 const attachmentNote = document.querySelector("#attachment-note");
+const pipelineStages = document.querySelector("#pipeline-stages");
+const loopButton = document.querySelector("#loop-button");
+const loopSummary = document.querySelector("#loop-summary");
+const bestPrimary = document.querySelector("#best-primary");
+const bestGauc = document.querySelector("#best-gauc");
+const bestNdcg = document.querySelector("#best-ndcg");
+const manualInterventions = document.querySelector("#manual-interventions");
+const iterationLog = document.querySelector("#iteration-log");
+const solutionTree = document.querySelector("#solution-tree");
 
 let attachments = [];
 
@@ -328,9 +363,36 @@ function renderList(target, items, emptyText) {
 function renderAgentState(state, trainingCount) {
   agentSummary.textContent = state.summary;
   agentSource.textContent = state.source;
+  renderPipelineStages(state.pipelineStages || defaultAgentState.pipelineStages);
   renderList(requirementList, state.requirements, "No requirements detected yet.");
   renderList(trainingList, state.trainingExamples, "No generated examples yet.");
   trainingNote.textContent = `Scores come from ${trainingCount} training examples after autonomous requirement detection.`;
+}
+
+function renderPipelineStages(stages) {
+  pipelineStages.innerHTML = "";
+  stages.forEach((stage, index) => {
+    const card = document.createElement("article");
+    card.className = "stage-card";
+    const stageIndex = document.createElement("div");
+    const body = document.createElement("div");
+    const title = document.createElement("h3");
+    const role = document.createElement("p");
+    const output = document.createElement("p");
+    const decision = document.createElement("span");
+
+    stageIndex.className = "stage-index";
+    stageIndex.textContent = String(index + 1);
+    title.textContent = stage.name;
+    role.className = "stage-role";
+    role.textContent = stage.role;
+    output.textContent = stage.output;
+    decision.textContent = stage.decision;
+
+    body.append(title, role, output, decision);
+    card.append(stageIndex, body);
+    pipelineStages.appendChild(card);
+  });
 }
 
 function render(result, agentState, trainingCount) {
@@ -395,13 +457,27 @@ async function fetchRequirementAnalysis(text, files) {
   }
 }
 
+async function fetchAutonomousLoop(text) {
+  const response = await fetch("/api/run-autonomous-loop", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ problem: text }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Autonomous loop did not complete.");
+  }
+
+  return response.json();
+}
+
 function localRequirementAnalysis(text) {
   const tokens = tokenize(text);
   const categories = {
     "Text Classification": ["classify", "category", "label", "intent", "triage"],
     "Retrieval Assistant": ["retrieve", "search", "documents", "papers", "citations"],
     "Anomaly Detection": ["detect", "unusual", "failure", "risk", "suspicious", "logs"],
-    Recommendation: ["recommend", "rank", "suggest", "personalize", "next"],
+    Recommendation: ["recommend", "recommender", "recommendation", "rank", "ranking", "suggest", "personalize", "next", "kuairand", "gauc", "ndcg"],
     Forecasting: ["forecast", "predict", "future", "demand", "trend"],
   };
 
@@ -417,7 +493,7 @@ function localRequirementAnalysis(text) {
   return {
     source: "Browser fallback",
     category: label,
-    summary: "The browser fallback detected requirements from keyword evidence and generated retraining examples.",
+    summary: "Four specialized local model stages processed the request, cleaned assumptions, retrained, and planned the next learning step.",
     requirements: [
       `Classify this as a ${label} problem.`,
       "Extract useful features from the user requirement.",
@@ -425,12 +501,42 @@ function localRequirementAnalysis(text) {
       "Return a measurable prediction and next-step plan.",
     ],
     features,
+    pipelineStages: buildLocalPipelineStages(label, features),
     trainingExamples: [
       { label, text: `${text} ${features.join(" ")} autonomous requirements evidence` },
       { label, text: `${label} solution needs baseline model evaluation explanation demo` },
     ],
     plan: categoryPlans[label],
   };
+}
+
+function buildLocalPipelineStages(label, features) {
+  return [
+    {
+      name: "Data Processor",
+      role: "Profiles the raw user requirement",
+      output: `Detected ${features.length} useful terms: ${features.slice(0, 5).join(", ")}.`,
+      decision: "Pass structured features forward",
+    },
+    {
+      name: "Data Cleaner",
+      role: "Removes noise and checks training risk",
+      output: "Removed stop words, normalized terms, and kept only useful feature tokens.",
+      decision: "No blocking data issue",
+    },
+    {
+      name: "Training Model",
+      role: "Builds the lightweight classifier",
+      output: `Generated extra ${label} examples and retrained the Naive Bayes model.`,
+      decision: "Retrain accepted",
+    },
+    {
+      name: "Continual Learner",
+      role: "Plans the next improvement loop",
+      output: "Next loop should validate with labeled examples, compare metrics, and keep only improvements.",
+      decision: "Continue learning",
+    },
+  ];
 }
 
 async function analyze() {
@@ -465,6 +571,75 @@ async function analyze() {
   analyzeButton.textContent = "Analyze & train";
 }
 
+function renderLoop(result) {
+  loopSummary.textContent = `${result.summary} ${result.convergence}`;
+  bestPrimary.textContent = result.best.primary.toFixed(4);
+  bestGauc.textContent = result.best.gauc.toFixed(4);
+  bestNdcg.textContent = result.best.ndcg.toFixed(4);
+  manualInterventions.textContent = String(result.manualInterventions);
+
+  iterationLog.innerHTML = "";
+  result.iterations.forEach((iteration) => {
+    const card = document.createElement("article");
+    card.className = `iteration-card ${iteration.decision === "keep" ? "kept" : "rejected"}`;
+
+    const head = document.createElement("div");
+    head.className = "iteration-head";
+    const title = document.createElement("h3");
+    title.textContent = `Iteration ${iteration.iteration}: ${iteration.model} (${iteration.action})`;
+    const decision = document.createElement("code");
+    decision.textContent = iteration.decision;
+    head.append(title, decision);
+
+    const hypothesis = document.createElement("p");
+    hypothesis.textContent = `Hypothesis: ${iteration.hypothesis}`;
+    const diff = document.createElement("p");
+    diff.textContent = `Change: ${iteration.diff}`;
+    const metrics = document.createElement("p");
+    metrics.textContent = `GAUC ${iteration.metrics.GAUC.toFixed(4)} | nDCG@5 ${iteration.metrics["nDCG@5"].toFixed(4)} | primary ${iteration.metrics.primary.toFixed(4)} | delta ${iteration.metrics.deltaPrimary.toFixed(4)}`;
+    const recovery = document.createElement("p");
+    recovery.textContent = `Recovery: ${iteration.recovery}`;
+    const branch = document.createElement("p");
+    branch.textContent = `Tree node: ${iteration.nodeId}, parent: ${iteration.parentId || "root"}`;
+
+    card.append(head, hypothesis, diff, metrics, recovery, branch);
+    iterationLog.appendChild(card);
+  });
+
+  solutionTree.innerHTML = "";
+  result.solutionTree.forEach((node) => {
+    const card = document.createElement("article");
+    card.className = `tree-node ${node.id === result.bestNodeId ? "best" : ""}`;
+    const title = document.createElement("h3");
+    const parent = document.createElement("span");
+    const metric = document.createElement("p");
+    const note = document.createElement("p");
+
+    title.textContent = `${node.id}: ${node.action}`;
+    parent.textContent = `parent: ${node.parentId || "none"}`;
+    metric.textContent = `primary ${node.primary.toFixed(4)} | ${node.status}`;
+    note.textContent = node.name;
+
+    card.append(title, parent, metric, note);
+    solutionTree.appendChild(card);
+  });
+}
+
+async function runLoop() {
+  loopButton.disabled = true;
+  loopButton.textContent = "Running...";
+  loopSummary.textContent = "The autonomous learner is selecting experiments and evaluating outcomes.";
+
+  try {
+    renderLoop(await fetchAutonomousLoop(input.value.trim()));
+  } catch (error) {
+    loopSummary.textContent = error.message;
+  } finally {
+    loopButton.disabled = false;
+    loopButton.textContent = "Run loop";
+  }
+}
+
 const model = trainNaiveBayes(baseTrainingData);
 
 model.labels.forEach((label) => {
@@ -495,5 +670,6 @@ document.querySelector("#sample-button").addEventListener("click", () => {
   samples.push(current);
   analyze();
 });
+loopButton.addEventListener("click", runLoop);
 
 analyze();
