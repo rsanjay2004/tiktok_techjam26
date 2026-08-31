@@ -34,9 +34,20 @@ We need an autonomous system that reviews agent run logs, detects failures or po
           </textarea>
 
           <div class="actions">
+            <button id="attach-button" type="button" class="secondary">Attach files</button>
             <button id="analyze-button" type="button">Analyze & train</button>
             <button id="clear-button" type="button" class="secondary">Clear</button>
           </div>
+
+          <input
+            id="file-input"
+            type="file"
+            multiple
+            hidden
+            accept=".txt,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.js,.ts,.jsx,.tsx,.py,.html,.css,.sql,.xml,text/*"
+          />
+          <ul id="attachment-list" class="attachment-list" aria-label="Attached files"></ul>
+          <p id="attachment-note" class="attachment-note" hidden></p>
         </section>
 
         <section class="agent-panel">

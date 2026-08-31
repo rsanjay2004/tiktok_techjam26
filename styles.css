@@ -190,6 +190,56 @@ textarea:focus {
   margin-top: 0.8rem;
 }
 
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.attachment-list:empty {
+  display: none;
+}
+
+.attachment-chip {
+  align-items: center;
+  background: var(--teal-soft);
+  border: 1px solid #b7ded6;
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 0.55rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+}
+
+.attachment-name {
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 800;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-remove {
+  background: #fff;
+  border: 1px solid #b7ded6;
+  border-radius: 999px;
+  color: var(--teal);
+  font-size: 0.72rem;
+  font-weight: 800;
+  min-height: 0;
+  padding: 0.2rem 0.55rem;
+}
+
+.attachment-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0.5rem 0 0;
+}
+
 .source-badge {
   background: var(--teal-soft);
   border: 1px solid #b7ded6;
