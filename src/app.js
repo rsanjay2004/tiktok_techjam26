@@ -111,6 +111,10 @@ const stopWords = new Set([
   "with",
 ]);
 
+const MAX_FILES = 6;
+const MAX_FILE_BYTES = 1_000_000;
+const MAX_TOTAL_CHARS = 120_000;
+
 const input = document.querySelector("#problem-input");
 const prediction = document.querySelector("#prediction");
 const confidenceLabel = document.querySelector("#confidence-label");
@@ -126,6 +130,122 @@ const agentSource = document.querySelector("#agent-source");
 const requirementList = document.querySelector("#requirement-list");
 const trainingList = document.querySelector("#training-list");
 const trainingNote = document.querySelector("#training-note");
+const attachButton = document.querySelector("#attach-button");
+const fileInput = document.querySelector("#file-input");
+const attachmentList = document.querySelector("#attachment-list");
+const attachmentNote = document.querySelector("#attachment-note");
+
+let attachments = [];
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function looksBinary(text) {
+  let control = 0;
+  const sample = text.slice(0, 4000);
+  for (const char of sample) {
+    const code = char.charCodeAt(0);
+    if (code === 0 || (code < 9) || (code > 13 && code < 32)) control += 1;
+  }
+  return sample.length > 0 && control / sample.length > 0.02;
+}
+
+function setAttachmentNote(message) {
+  attachmentNote.textContent = message || "";
+  attachmentNote.hidden = !message;
+}
+
+function renderAttachments() {
+  attachmentList.innerHTML = "";
+  attachments.forEach((file, index) => {
+    const li = document.createElement("li");
+    li.className = "attachment-chip";
+    const name = document.createElement("span");
+    name.className = "attachment-name";
+    name.textContent = `${file.name} · ${formatBytes(file.size)}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "attachment-remove";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${file.name}`);
+    remove.addEventListener("click", () => {
+      attachments.splice(index, 1);
+      renderAttachments();
+    });
+    li.append(name, remove);
+    attachmentList.appendChild(li);
+  });
+}
+
+async function addFiles(fileList) {
+  const skipped = [];
+
+  for (const file of fileList) {
+    if (attachments.length >= MAX_FILES) {
+      skipped.push(`${file.name} (max ${MAX_FILES} files)`);
+      continue;
+    }
+    if (attachments.some((item) => item.name === file.name && item.size === file.size)) {
+      continue;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      skipped.push(`${file.name} (over ${formatBytes(MAX_FILE_BYTES)})`);
+      continue;
+    }
+
+    let text = "";
+    try {
+      text = await file.text();
+    } catch {
+      skipped.push(`${file.name} (could not read)`);
+      continue;
+    }
+
+    if (looksBinary(text)) {
+      skipped.push(`${file.name} (not a text file)`);
+      continue;
+    }
+
+    attachments.push({ name: file.name, size: file.size, type: file.type || "text/plain", text });
+  }
+
+  renderAttachments();
+  setAttachmentNote(skipped.length ? `Skipped: ${skipped.join(", ")}` : "");
+}
+
+function buildAttachmentPayload() {
+  let budget = MAX_TOTAL_CHARS;
+  let truncatedAny = false;
+  const payload = [];
+
+  for (const file of attachments) {
+    if (budget <= 0) {
+      truncatedAny = true;
+      break;
+    }
+    let text = file.text;
+    if (text.length > budget) {
+      text = `${text.slice(0, budget)}\n...[truncated]`;
+      truncatedAny = true;
+    }
+    budget -= text.length;
+    payload.push({ name: file.name, type: file.type, text });
+  }
+
+  if (truncatedAny) {
+    setAttachmentNote("Attached content was truncated to stay within the size limit.");
+  }
+  return payload;
+}
+
+function attachmentsAsText(files) {
+  return files
+    .map((file) => `--- File: ${file.name} ---\n${file.text}`)
+    .join("\n\n");
+}
 
 function tokenize(text) {
   return text
@@ -257,12 +377,12 @@ function render(result, agentState, trainingCount) {
   });
 }
 
-async function fetchRequirementAnalysis(text) {
+async function fetchRequirementAnalysis(text, files) {
   try {
     const response = await fetch("/api/analyze-requirements", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ problem: text }),
+      body: JSON.stringify({ problem: text, attachments: files }),
     });
 
     if (!response.ok) {
@@ -271,7 +391,7 @@ async function fetchRequirementAnalysis(text) {
 
     return await response.json();
   } catch {
-    return localRequirementAnalysis(text);
+    return localRequirementAnalysis([text, attachmentsAsText(files)].filter(Boolean).join("\n\n"));
   }
 }
 
@@ -315,11 +435,13 @@ function localRequirementAnalysis(text) {
 
 async function analyze() {
   const text = input.value.trim();
-  if (!text) {
+  const files = buildAttachmentPayload();
+
+  if (!text && !files.length) {
     prediction.textContent = "Add a problem";
     confidenceLabel.textContent = "0%";
     confidenceBar.style.width = "0";
-    evidenceList.innerHTML = "<li>Paste a research statement to start the autonomous analysis.</li>";
+    evidenceList.innerHTML = "<li>Paste a research statement or attach files to start the autonomous analysis.</li>";
     planList.innerHTML = "<li>The model will generate next actions after classification.</li>";
     scoreboard.innerHTML = "";
     renderAgentState(defaultAgentState, baseTrainingData.length);
@@ -330,13 +452,14 @@ async function analyze() {
   analyzeButton.textContent = "Analyzing...";
   modelStatus.lastChild.textContent = " Training...";
 
-  const agentState = await fetchRequirementAnalysis(text);
+  const agentState = await fetchRequirementAnalysis(text, files);
   const generatedExamples = Array.isArray(agentState.trainingExamples) ? agentState.trainingExamples : [];
   const augmentedTrainingData = [...baseTrainingData, ...generatedExamples];
   const trainedModel = trainNaiveBayes(augmentedTrainingData);
 
+  const classificationText = [text, attachmentsAsText(files)].filter(Boolean).join("\n\n");
   modelStatus.lastChild.textContent = agentState.source.includes("OpenAI") ? " OpenAI trained" : " Local trained";
-  render(classify(trainedModel, text), agentState, augmentedTrainingData.length);
+  render(classify(trainedModel, classificationText), agentState, augmentedTrainingData.length);
 
   analyzeButton.disabled = false;
   analyzeButton.textContent = "Analyze & train";
@@ -354,7 +477,17 @@ model.labels.forEach((label) => {
 document.querySelector("#analyze-button").addEventListener("click", analyze);
 document.querySelector("#clear-button").addEventListener("click", () => {
   input.value = "";
+  attachments = [];
+  fileInput.value = "";
+  renderAttachments();
+  setAttachmentNote("");
   analyze();
+});
+
+attachButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  await addFiles(Array.from(fileInput.files || []));
+  fileInput.value = "";
 });
 document.querySelector("#sample-button").addEventListener("click", () => {
   const current = samples.shift();
