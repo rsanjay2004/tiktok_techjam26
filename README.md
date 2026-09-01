@@ -102,3 +102,19 @@ npm start
 ```
 
 The dashboard separates the planning demonstration from measured benchmark output and displays the real model scores and selected winner directly.
+
+## Reproducible benchmark outputs
+
+The full-data benchmark writes these files after a successful run:
+
+- `runs/benchmark_report.json`: starter-kit run status, timing, and model logs.
+- `runs/real_iteration_log.jsonl`: one measured record per candidate, including hypothesis, validation metrics, baseline delta, decision, and intervention count.
+- `outputs/submission_valid.csv`: schema-validated validation submission.
+- `outputs/submission_test.csv`: schema-validated test submission for final evaluation.
+- `outputs/selected_fm_checkpoint.npz`: selected FM parameters (`V`, `W`, and `b`).
+- `outputs/final_metrics.json`: winner, validation/test metrics, official-baseline deltas, iteration count, wall-clock time, token count, and GPU hours.
+- `runs/experiment_memory.json`: the current best candidate, rejected candidates, promotion margin, and the next experiment selected from prior evidence.
+
+The current full-data run evaluates 12 candidates. It includes hard-negative and uniform-negative pairwise training, a randomized-exposure feature diagnostic, multi-behavior and PLE candidates, and FM promotion with a validation margin of `0.002`. With no `OPENAI_API_KEY`, candidate ordering uses the deterministic safe fallback; with a key, the optional planner may reorder the controlled candidate menu. The benchmark evaluator remains authoritative.
+
+The continual-learning controller is bounded: it reads experiment memory, proposes one controlled change, trains it, evaluates validation metrics, saves a checkpoint only after promotion, and records rollback when the candidate fails. Pairwise training uses a uniform/hard-negative mixture because the measured pure hard-negative variant was unstable. Re-run the full benchmark after code changes to refresh the generated metrics and memory files.
