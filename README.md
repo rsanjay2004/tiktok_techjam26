@@ -2,6 +2,10 @@
 
 This project implements a requirement-triage interface and a KuaiRand-Pure autonomous recommender research benchmark.
 
+## Scope
+
+This submission targets the KuaiRand-Pure recommendation-system track. The requirement classifier is a supporting interface that translates a research brief into candidate experiments; the official KuaiRand pipeline remains the source of truth for training, evaluation, and model selection.
+
 The app uses an optional multi-provider AI layer to interpret research requirements, while the Python pipeline performs the real KuaiRand recommendation experiments. The official evaluator, not an LLM or the dashboard planning demo, determines benchmark quality.
 
 ## Why this project works for a demo
@@ -72,17 +76,17 @@ Research teams often lose time deciding which ML method best fits a vague proble
 
 ## Literature-backed competition strategy
 
-See [docs/literature_strategy.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/literature_strategy.md) for the recommended pivot into **AutoScaleRec**, an autonomous scalable recommender research agent for KuaiRand-Pure.
+See [docs/literature_strategy.md](docs/literature_strategy.md) for the recommended pivot into **AutoScaleRec**, an autonomous scalable recommender research agent for KuaiRand-Pure.
 
-See [docs/kuairand_starter_kit_test_report.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/kuairand_starter_kit_test_report.md) for the starter-kit zip smoke test results.
+See [docs/kuairand_starter_kit_test_report.md](docs/kuairand_starter_kit_test_report.md) for the starter-kit zip smoke test results.
 
-See [docs/multi_model_framework.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/multi_model_framework.md) for the four-model autonomous learning framework.
+See [docs/multi_model_framework.md](docs/multi_model_framework.md) for the four-model autonomous learning framework.
 
-See [docs/current_project_review.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/current_project_review.md) for a critical review of what is strong today and what still needs to become real benchmark work.
+See [docs/current_project_review.md](docs/current_project_review.md) for a critical review of the measured results and remaining work.
 
-See [docs/aide_integration_plan.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/aide_integration_plan.md) for how the project adapts AIDE-style solution-space tree search.
+See [docs/aide_integration_plan.md](docs/aide_integration_plan.md) for how the project adapts AIDE-style solution-space tree search.
 
-See [docs/provider_roles.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/provider_roles.md) for the multi-provider routing and continuous-learning policy.
+See [docs/provider_roles.md](docs/provider_roles.md) for the multi-provider routing and continuous-learning policy.
 
 ## Real KuaiRand benchmark bridge
 

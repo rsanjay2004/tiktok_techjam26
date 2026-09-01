@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
     data_dir = find_data_dir(args.data_dir)
@@ -95,6 +96,8 @@ def main():
                 "--epochs",
                 str(max(1, min(args.epochs, 3))),
             ]
+            if args.verbose:
+                command.append("--verbose")
         else:
             command = [
                 args.python,

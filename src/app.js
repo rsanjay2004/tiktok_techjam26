@@ -168,14 +168,10 @@ const bestPrimary = document.querySelector("#best-primary");
 const bestGauc = document.querySelector("#best-gauc");
 const bestNdcg = document.querySelector("#best-ndcg");
 const manualInterventions = document.querySelector("#manual-interventions");
-const iterationLog = document.querySelector("#iteration-log");
 const solutionTree = document.querySelector("#solution-tree");
 const benchmarkButton = document.querySelector("#benchmark-button");
 const benchmarkStatus = document.querySelector("#benchmark-status");
 const benchmarkResults = document.querySelector("#benchmark-results");
-const targetPrimary = document.querySelector("#target-primary");
-const maxIterations = document.querySelector("#max-iterations");
-const maxNoImprove = document.querySelector("#max-no-improve");
 
 let attachments = [];
 
@@ -476,12 +472,7 @@ async function fetchAutonomousLoop(text) {
   const response = await fetch("/api/run-autonomous-loop", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      problem: text,
-      targetPrimary: Number(targetPrimary.value),
-      maxIterations: Number(maxIterations.value),
-      maxNoImprove: Number(maxNoImprove.value),
-    }),
+    body: JSON.stringify({ problem: text }),
   });
 
   if (!response.ok) {
@@ -592,57 +583,43 @@ async function analyze() {
 }
 
 function renderLoop(result) {
-  loopSummary.textContent = `Planning demonstration only: ${result.convergence} Measured scores are shown by Run KuaiRand benchmark.`;
-  bestPrimary.textContent = result.best.primary.toFixed(4);
-  bestGauc.textContent = result.best.gauc.toFixed(4);
-  bestNdcg.textContent = result.best.ndcg.toFixed(4);
-  manualInterventions.textContent = String(result.manualInterventions);
-
-  iterationLog.innerHTML = "";
-  result.iterations.forEach((iteration) => {
-    const card = document.createElement("article");
-    card.className = `iteration-card ${iteration.decision === "keep" ? "kept" : "rejected"}`;
-
-    const head = document.createElement("div");
-    head.className = "iteration-head";
-    const title = document.createElement("h3");
-    title.textContent = `Iteration ${iteration.iteration}: ${iteration.model} (${iteration.action})`;
-    const decision = document.createElement("code");
-    decision.textContent = iteration.decision;
-    head.append(title, decision);
-
-    const hypothesis = document.createElement("p");
-    hypothesis.textContent = `Hypothesis: ${iteration.hypothesis}`;
-    const diff = document.createElement("p");
-    diff.textContent = `Change: ${iteration.diff}`;
-    const metrics = document.createElement("p");
-    metrics.textContent = `GAUC ${iteration.metrics.GAUC.toFixed(4)} | nDCG@5 ${iteration.metrics["nDCG@5"].toFixed(4)} | primary ${iteration.metrics.primary.toFixed(4)} | delta ${iteration.metrics.deltaPrimary.toFixed(4)}`;
-    const recovery = document.createElement("p");
-    recovery.textContent = `Recovery: ${iteration.recovery}`;
-    const branch = document.createElement("p");
-    branch.textContent = `Tree node: ${iteration.nodeId}, parent: ${iteration.parentId || "root"}`;
-
-    card.append(head, hypothesis, diff, metrics, recovery, branch);
-    iterationLog.appendChild(card);
-  });
-
   solutionTree.innerHTML = "";
-  result.solutionTree.forEach((node) => {
-    const card = document.createElement("article");
-    card.className = `tree-node ${node.id === result.bestNodeId ? "best" : ""}`;
-    const title = document.createElement("h3");
-    const parent = document.createElement("span");
-    const metric = document.createElement("p");
-    const note = document.createElement("p");
-
-    title.textContent = `${node.id}: ${node.action}`;
-    parent.textContent = `parent: ${node.parentId || "none"}`;
-    metric.textContent = `primary ${node.primary.toFixed(4)} | ${node.status}`;
-    note.textContent = node.name;
-
-    card.append(title, parent, metric, note);
-    solutionTree.appendChild(card);
+  const fm = result.candidates?.fm_baseline?.valid?.primary;
+  const winner = result.winner;
+  const winnerTest = Number(result.test?.primary);
+  const candidates = Object.entries(result.candidates || {}).sort(([, a], [, b]) => b.valid.primary - a.valid.primary);
+  const challengerCount = candidates.filter(([name]) => name !== "fm_baseline").filter(([, value]) => value.valid.primary >= fm + Number(result.promotion_margin || 0)).length;
+  const banner = document.createElement("p");
+  banner.className = "benchmark-decision";
+  banner.textContent = `${challengerCount} of 7 candidates beat the FM baseline by the required ${Number(result.promotion_margin || 0).toFixed(3)} margin. Current best model: ${winner === "fm_baseline" ? "FM baseline" : winner} (test primary ${winnerTest.toFixed(4)}).`;
+  solutionTree.appendChild(banner);
+  const rule = document.createElement("p");
+  rule.className = "benchmark-rule";
+  rule.textContent = `Promotion rule: ${result.promotion_rule}`;
+  solutionTree.appendChild(rule);
+  const table = document.createElement("table");
+  table.className = "benchmark-table candidate-table";
+  table.innerHTML = "<thead><tr><th>Name</th><th>Valid Primary</th><th>Delta vs FM</th><th>Decision</th></tr></thead>";
+  const body = document.createElement("tbody");
+  candidates.forEach(([name, value]) => {
+    const row = document.createElement("tr");
+    if (name === winner) row.className = "winner-row";
+    const delta = value.valid.primary - fm;
+    const label = name === "fm_baseline" ? "FM baseline" : name;
+    [label, value.valid.primary.toFixed(4), `${delta >= 0 ? "+" : ""}${delta.toFixed(4)}`, name === winner ? "Accepted" : "Rejected"].forEach((item) => {
+      const cell = document.createElement("td");
+      cell.textContent = item;
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
   });
+  table.appendChild(body);
+  solutionTree.appendChild(table);
+  bestPrimary.textContent = result.candidates?.[winner]?.valid?.primary?.toFixed(4) || "-";
+  bestGauc.textContent = result.candidates?.[winner]?.valid?.GAUC?.toFixed(4) || "-";
+  bestNdcg.textContent = result.candidates?.[winner]?.valid?.["nDCG@5"]?.toFixed(4) || "-";
+  manualInterventions.textContent = "0";
+  loopSummary.textContent = "Real benchmark candidates loaded from evaluate.py. No metric is synthesized in the dashboard.";
 }
 
 function parseMeasuredMetrics(item) {
@@ -716,7 +693,9 @@ async function runBenchmark() {
     } else if (result.status === "completed") {
       const models = result.models.map((item) => `${item.model}: ${item.seconds}s`).join(" | ");
       benchmarkStatus.textContent = `Real starter-kit runs completed: ${models}.`;
-      renderBenchmarkResults(result);
+      const reportResponse = await fetch("/api/run-autonomous-loop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const report = await reportResponse.json();
+      if (report.status === "completed") renderLoop(report);
     } else {
       benchmarkStatus.textContent = result.message || "Benchmark could not complete.";
     }

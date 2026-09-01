@@ -317,6 +317,9 @@ textarea:focus {
 .benchmark-table th, .benchmark-table td { border-bottom: 1px solid var(--line); padding: 0.7rem 0.55rem; text-align: left; }
 .benchmark-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
 .benchmark-table td { color: var(--ink); font-variant-numeric: tabular-nums; }
+.benchmark-decision { background: var(--teal-soft); border-left: 4px solid var(--teal); color: var(--ink); font-weight: 800; margin: 0 0 0.6rem; padding: 0.8rem 1rem; }
+.benchmark-rule { color: var(--muted); font-size: 0.82rem; margin: 0 0 0.8rem; }
+.candidate-table .winner-row { background: #e9f7f3; }
 
 .agent-panel {
   margin-top: 1rem;

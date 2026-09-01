@@ -198,7 +198,7 @@ def train_fm_predictions(data_dir, kit_dir, epochs=11):
     return model.predict(Xva), model.predict(Xte), best_score
 
 
-def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000):
+def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000, kit_dir=None, valid_users=None, valid_labels=None, valid_features=None, verbose=False):
     mean = X.mean(axis=0)
     scale = X.std(axis=0) + 1e-6
     Z = (X - mean) / scale
@@ -212,11 +212,12 @@ def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000):
         if positives and negatives:
             eligible.append((positives, negatives))
     rng = np.random.default_rng(seed)
-    weights = np.zeros(Z.shape[1], dtype=np.float32)
+    positive_indices = np.flatnonzero(y > 0.5)
+    negative_indices = np.flatnonzero(y <= 0.5)
+    weights = (Z[positive_indices].mean(axis=0) - Z[negative_indices].mean(axis=0)).astype(np.float32)
     for epoch in range(epochs):
         for _ in range(min(pairs_per_epoch, len(eligible) * 20)):
             positives, negatives = eligible[int(rng.integers(len(eligible)))]
-            delta = Z[rng.choice(positives)] - Z[rng.choice(negatives)]
             hard_negatives = rng.choice(negatives, size=min(5, len(negatives)), replace=False)
             positive = Z[rng.choice(positives)]
             negative = Z[hard_negatives[np.argmax(Z[hard_negatives] @ weights)]]
@@ -224,6 +225,11 @@ def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000):
             margin = float(np.dot(weights, delta))
             gradient = 1.0 / (1.0 + math.exp(min(30.0, max(-30.0, margin))))
             weights += 0.01 * (gradient * delta - 1e-4 * weights)
+        if verbose and kit_dir is not None and valid_users is not None and valid_labels is not None and valid_features is not None:
+            result = evaluate(kit_dir, valid_users, valid_labels, valid_features @ weights)
+            print(f"pairwise epoch {epoch + 1}: valid GAUC {result['GAUC']:.4f} primary {result['primary']:.4f}")
+    if verbose:
+        print(f"pairwise weights: norm={np.linalg.norm(weights):.6f} item_feature={weights[0]:.6f}")
     return mean, scale, weights
 
 
@@ -260,7 +266,16 @@ def run(args):
     Xtr, ytr, utr, atr = features["train"]
     Xva, yva, uva, ava = features["valid"]
     Xte, yte, ute, ate = features["test"]
-    mean, scale, weights = pairwise_fit(Xtr, ytr, utr, epochs=args.epochs)
+    diagnostic_mean = Xtr.mean(axis=0)
+    diagnostic_scale = Xtr.std(axis=0) + 1e-6
+    diagnostic_Zva = (Xva - diagnostic_mean) / diagnostic_scale
+    if args.verbose:
+        raw_item = evaluate(args.kit_dir, uva, yva, diagnostic_Zva[:, 0])
+        print(f"raw item ablation: valid GAUC {raw_item['GAUC']:.4f} nDCG@5 {raw_item['nDCG@5']:.4f} primary {raw_item['primary']:.4f}")
+    mean, scale, weights = pairwise_fit(
+        Xtr, ytr, utr, epochs=args.epochs, kit_dir=args.kit_dir,
+        valid_users=uva, valid_labels=yva, valid_features=diagnostic_Zva, verbose=args.verbose,
+    )
     auxiliary_heads = auxiliary_fit(Xtr, atr, mean, scale)
     Ztr, Zva, Zte = (Xtr - mean) / scale, (Xva - mean) / scale, (Xte - mean) / scale
     auxiliary_mix = np.asarray([0.15, 0.15, 0.2, 0.15, 0.15, -0.2], dtype=np.float32)
@@ -324,5 +339,6 @@ if __name__ == "__main__":
     parser.add_argument("--kit-dir", required=True)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--fm-epochs", type=int, default=11)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     print(json.dumps(run(args)))

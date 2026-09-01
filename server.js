@@ -11,7 +11,6 @@ const anthropicModel = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-latest";
 const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 const geminiModel = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const runLogDir = path.join(root, "runs");
-const runLogPath = path.join(runLogDir, "iteration_log.jsonl");
 const benchmarkReportPath = path.join(root, "runs", "benchmark_report.json");
 
 const categories = [
@@ -176,213 +175,30 @@ function buildFallbackPipelineStages(category, features) {
   ];
 }
 
-const experimentMenu = [
-  {
-    id: "composite_satisfaction",
-    name: "Composite Satisfaction Target",
-    hypothesis: "Long-view quality should improve when likes, follows, comments, forwards, and hate signals shape sample weights.",
-    diff: "Add multi-behavior satisfaction weighting before model training.",
-    metricLift: { gauc: 0.0062, ndcg: 0.0048 },
-    cost: "low",
-  },
-  {
-    id: "time_decay_profile",
-    name: "Time-Decayed User Profile",
-    hypothesis: "Recent interactions should represent current user intent better than an unweighted history average.",
-    diff: "Add recency-weighted user-video and user-author aggregates.",
-    metricLift: { gauc: 0.0041, ndcg: 0.0034 },
-    cost: "low",
-  },
-  {
-    id: "pairwise_ranking_loss",
-    name: "Pairwise Ranking Loss",
-    hypothesis: "A ranking objective should align better with GAUC and nDCG@5 than pointwise log loss.",
-    diff: "Switch training objective from pointwise classification to within-user positive-negative pairs.",
-    metricLift: { gauc: 0.0074, ndcg: 0.0059 },
-    cost: "medium",
-  },
-  {
-    id: "multi_context_retrieval",
-    name: "Multi-Context Candidate Retrieval",
-    hypothesis: "Separate long-view, recent-watch, and negative-interest contexts should improve scalable candidate selection.",
-    diff: "Create multiple compact user profiles and rank only merged candidate impressions.",
-    metricLift: { gauc: 0.0031, ndcg: 0.0068 },
-    cost: "medium",
-  },
-  {
-    id: "oversized_embedding",
-    name: "Oversized Embedding Capacity",
-    hypothesis: "Larger embeddings might capture user-video interaction detail.",
-    diff: "Increase latent factor dimension without changing data or objective.",
-    metricLift: { gauc: -0.0026, ndcg: -0.0018 },
-    cost: "high",
-  },
-];
-
-function nextExperiment(iteration, used) {
-  const unused = experimentMenu.filter((experiment) => !used.has(experiment.id));
-  if (!unused.length) {
-    return null;
-  }
-
-  if (iteration === 1) {
-    return unused.find((experiment) => experiment.id === "composite_satisfaction");
-  }
-  if (iteration === 2) {
-    return unused.find((experiment) => experiment.id === "pairwise_ranking_loss");
-  }
-  return unused[0];
-}
-
-function roundMetric(value) {
-  return Number(value.toFixed(4));
-}
-
-function runAutonomousLoop(problem, options = {}) {
-  const startedAt = Date.now();
-  const targetPrimary = Number.isFinite(options.targetPrimary) ? Math.max(0, Math.min(1, options.targetPrimary)) : 0.65;
-  const maxIterations = Number.isFinite(options.maxIterations) ? Math.max(1, Math.min(50, Math.floor(options.maxIterations))) : 5;
-  const maxNoImprove = Number.isFinite(options.maxNoImprove) ? Math.max(1, Math.min(10, Math.floor(options.maxNoImprove))) : 3;
-  const used = new Set();
-  const iterations = [];
-  const baseline = { gauc: 0.661, ndcg: 0.5282 };
-  let best = {
-    iteration: 0,
-    experiment: "Official FM baseline",
-    gauc: baseline.gauc,
-    ndcg: baseline.ndcg,
-    primary: (baseline.gauc + baseline.ndcg) / 2,
-  };
-  let current = { ...baseline };
-  let noImprove = 0;
-  const solutionTree = [
-    {
-      id: "n0",
-      parentId: null,
-      action: "draft",
-      name: "Official FM baseline",
-      primary: roundMetric(best.primary),
-      status: "baseline",
-    },
-  ];
-  let baseNodeId = "n0";
-
-  for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
-    const experiment = nextExperiment(iteration, used);
-    if (!experiment) {
-      break;
-    }
-    used.add(experiment.id);
-
-    const candidate = {
-      gauc: current.gauc + experiment.metricLift.gauc,
-      ndcg: current.ndcg + experiment.metricLift.ndcg,
-    };
-    const primary = (candidate.gauc + candidate.ndcg) / 2;
-    const delta = primary - best.primary;
-    const kept = delta > 0.002;
-    const error = experiment.id === "oversized_embedding" ? "Validation regressed and cost tier increased." : "";
-    const action = experiment.id === "oversized_embedding" ? "debug" : iteration === 1 ? "draft" : "improve";
-    const nodeId = `n${iteration}`;
-
-    if (kept) {
-      current = candidate;
-      best = {
-        iteration,
-        experiment: experiment.name,
-        gauc: roundMetric(candidate.gauc),
-        ndcg: roundMetric(candidate.ndcg),
-        primary: roundMetric(primary),
-      };
-      baseNodeId = nodeId;
-      noImprove = 0;
-    } else {
-      noImprove += 1;
-    }
-
-    solutionTree.push({
-      id: nodeId,
-      parentId: baseNodeId === nodeId ? solutionTree.at(-1)?.id || "n0" : baseNodeId,
-      action,
-      name: experiment.name,
-      primary: roundMetric(primary),
-      status: kept ? "selected as new base" : "rejected and rolled back",
-    });
-
-    iterations.push({
-      iteration,
-      nodeId,
-      parentId: solutionTree.at(-1).parentId,
-      action,
-      model: modelForExperiment(experiment.id),
-      hypothesis: experiment.hypothesis,
-      diff: experiment.diff,
-      metrics: {
-        GAUC: roundMetric(candidate.gauc),
-        "nDCG@5": roundMetric(candidate.ndcg),
-        primary: roundMetric(primary),
-        deltaPrimary: roundMetric(delta),
-      },
-      decision: kept ? "keep" : "reject",
-      recovery: kept ? "No recovery needed." : `Rolled back to ${best.experiment}. ${error}`.trim(),
-      costTier: experiment.cost,
-    });
-
-    if (best.primary >= targetPrimary || noImprove >= maxNoImprove) {
-      break;
-    }
-  }
-
-  const targetReached = best.primary >= targetPrimary;
-
-  return {
-    runId: `run-${startedAt}`,
-    problem,
-    summary: "Completed an autonomous improvement loop over a controlled experiment menu. Metrics are framework-demo estimates until the real KuaiRand-Pure data is wired in.",
-    best,
-    bestNodeId: baseNodeId,
-    solutionTree,
-    convergence: targetReached
-      ? `Target primary ${targetPrimary.toFixed(4)} reached.`
-      : noImprove >= maxNoImprove
-        ? `Stopped after ${maxNoImprove} non-improving iterations.`
-        : `Stopped after ${iterations.length} available experiments. Target primary was ${targetPrimary.toFixed(4)}.`,
-    targetPrimary,
-    targetReached,
-    maxIterations,
-    maxNoImprove,
-    manualInterventions: 0,
-    tokenEstimate: 2600 + iterations.length * 550,
-    wallClockMs: Date.now() - startedAt,
-    iterations,
-  };
-}
-
-function modelForExperiment(experimentId) {
-  const map = {
-    composite_satisfaction: "Training Model",
-    time_decay_profile: "Data Processor",
-    pairwise_ranking_loss: "Training Model",
-    multi_context_retrieval: "Data Processor",
-    oversized_embedding: "Continual Learner",
-  };
-  return map[experimentId] || "Continual Learner";
-}
-
 async function handleRunLoop(request, response) {
   try {
-    const body = JSON.parse(await readBody(request));
-    const problem = String(body.problem || "").trim() || "Improve KuaiRand-Pure recommender quality.";
-    const result = runAutonomousLoop(problem, {
-      targetPrimary: Number(body.targetPrimary),
-      maxIterations: Number(body.maxIterations),
-      maxNoImprove: Number(body.maxNoImprove),
+    const report = JSON.parse(await fs.readFile(benchmarkReportPath, "utf8"));
+    const autoscale = report.models?.find((item) => item.model === "autoscale");
+    const raw = JSON.parse(String(autoscale?.log || "").slice(String(autoscale?.log || "").indexOf("{")));
+    const candidates = Object.fromEntries(Object.entries(raw.valid || {}).map(([name, metrics]) => [name, {
+      valid: { primary: Number(metrics.primary), GAUC: Number(metrics.GAUC), "nDCG@5": Number(metrics["nDCG@5"]) },
+    }]));
+    sendJson(response, 200, {
+      status: "completed",
+      candidates,
+      winner: raw.winner,
+      raw_winner: raw.raw_winner,
+      official_fm_validation_primary: raw.official_fm_validation_primary,
+      promotion_margin: raw.promotion_margin,
+      promotion_rule: raw.promotion_rule,
+      test: raw.test,
     });
-    await fs.mkdir(runLogDir, { recursive: true });
-    await fs.appendFile(runLogPath, `${JSON.stringify({ timestamp: new Date().toISOString(), ...result })}\n`);
-    sendJson(response, 200, result);
   } catch (error) {
-    sendJson(response, 500, { error: error.message });
+    if (error.code === "ENOENT") {
+      sendJson(response, 200, { status: "missing_dataset", message: "Run the KuaiRand benchmark first." });
+      return;
+    }
+    sendJson(response, 500, { status: "error", message: "Benchmark report could not be read.", details: error.message });
   }
 }
 

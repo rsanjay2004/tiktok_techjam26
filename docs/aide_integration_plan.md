@@ -23,7 +23,7 @@ For our project, this is stronger than a simple linear loop because it shows not
 | Debug node | Failed or regressing experiment that triggers rollback |
 | Evaluator | KuaiRand `evaluate.py` for real GAUC and nDCG@5 |
 | Selector | Keep the node only if validation primary improves by more than 0.002 |
-| Search tree | Logged parent-child experiment graph in `runs/iteration_log.jsonl` |
+| Search tree | Report-backed candidate comparison in `runs/benchmark_report.json` |
 
 ## Current implementation
 
@@ -36,7 +36,7 @@ The app now includes an AIDE-style demo loop:
 - Selects the best node
 - Rejects a regressing branch and rolls back
 
-This is currently a **framework demonstration**. The metric values are simulated until the real KuaiRand training path is wired in.
+The AIDE-style planning idea is now paired with a real KuaiRand training path. The dashboard reports measured candidates from `runs/benchmark_report.json`; it does not invent metric values.
 
 ## Real benchmark implementation path
 
