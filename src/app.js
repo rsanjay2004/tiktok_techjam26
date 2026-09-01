@@ -591,7 +591,7 @@ function renderLoop(result) {
   const challengerCount = candidates.filter(([name]) => name !== "fm_baseline").filter(([, value]) => value.valid.primary >= fm + Number(result.promotion_margin || 0)).length;
   const banner = document.createElement("p");
   banner.className = "benchmark-decision";
-  banner.textContent = `${challengerCount} of 7 candidates beat the FM baseline by the required ${Number(result.promotion_margin || 0).toFixed(3)} margin. Current best model: ${winner === "fm_baseline" ? "FM baseline" : winner} (test primary ${winnerTest.toFixed(4)}).`;
+  banner.textContent = `${challengerCount} of ${Math.max(candidates.length - 1, 0)} candidates beat the FM baseline by the required ${Number(result.promotion_margin || 0).toFixed(3)} margin. Current best model: ${winner === "fm_baseline" ? "FM baseline" : winner} (test primary ${winnerTest.toFixed(4)}).`;
   solutionTree.appendChild(banner);
   const rule = document.createElement("p");
   rule.className = "benchmark-rule";

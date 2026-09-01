@@ -198,7 +198,7 @@ def train_fm_predictions(data_dir, kit_dir, epochs=11):
     return model.predict(Xva), model.predict(Xte), best_score
 
 
-def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000, kit_dir=None, valid_users=None, valid_labels=None, valid_features=None, verbose=False):
+def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000, kit_dir=None, valid_users=None, valid_labels=None, valid_features=None, verbose=False, l2=1e-4, hard_negative=True):
     mean = X.mean(axis=0)
     scale = X.std(axis=0) + 1e-6
     Z = (X - mean) / scale
@@ -220,17 +220,56 @@ def pairwise_fit(X, y, users, seed=0, epochs=3, pairs_per_epoch=120000, kit_dir=
             positives, negatives = eligible[int(rng.integers(len(eligible)))]
             hard_negatives = rng.choice(negatives, size=min(5, len(negatives)), replace=False)
             positive = Z[rng.choice(positives)]
-            negative = Z[hard_negatives[np.argmax(Z[hard_negatives] @ weights)]]
+            negative_index = hard_negatives[np.argmax(Z[hard_negatives] @ weights)] if hard_negative else rng.choice(negatives)
+            negative = Z[negative_index]
             delta = positive - negative
             margin = float(np.dot(weights, delta))
             gradient = 1.0 / (1.0 + math.exp(min(30.0, max(-30.0, margin))))
-            weights += 0.01 * (gradient * delta - 1e-4 * weights)
+            weights += 0.01 * (gradient * delta - l2 * weights)
         if verbose and kit_dir is not None and valid_users is not None and valid_labels is not None and valid_features is not None:
             result = evaluate(kit_dir, valid_users, valid_labels, valid_features @ weights)
-            print(f"pairwise epoch {epoch + 1}: valid GAUC {result['GAUC']:.4f} primary {result['primary']:.4f}")
+            print(f"pairwise epoch {epoch + 1}: valid GAUC {result['GAUC']:.4f} primary {result['primary']:.4f} item_feature={weights[0]:.6f}")
     if verbose:
         print(f"pairwise weights: norm={np.linalg.norm(weights):.6f} item_feature={weights[0]:.6f}")
     return mean, scale, weights
+
+
+def ple_fit(X, targets, mean, scale, epochs=2, experts_count=3):
+    """Train a small progressive-layered-style mixture of task experts."""
+    Z = (X - mean) / scale
+    # Keep this exploratory head bounded; the official FM still trains on all rows.
+    limit = min(len(Z), 250000)
+    Z, targets = Z[:limit], targets[:limit]
+    rng = np.random.default_rng(0)
+    experts = rng.normal(0, 0.01, (Z.shape[1], experts_count)).astype(np.float32)
+    task_heads = np.zeros((experts_count, targets.shape[1]), dtype=np.float32)
+    gate = np.zeros((Z.shape[1], experts_count), dtype=np.float32)
+    for _ in range(epochs):
+        for start in range(0, len(Z), 8192):
+            batch = Z[start:start + 8192]
+            truth = targets[start:start + 8192]
+            latent = batch @ experts
+            gate_logits = np.clip(batch @ gate, -12, 12)
+            gate_prob = np.exp(gate_logits - gate_logits.max(axis=1, keepdims=True))
+            gate_prob /= gate_prob.sum(axis=1, keepdims=True)
+            logits = (latent * gate_prob) @ task_heads
+            prediction = 1.0 / (1.0 + np.exp(-np.clip(logits, -20, 20)))
+            error = (prediction - truth) / max(len(batch), 1)
+            mixed_experts = latent * gate_prob
+            task_heads -= 0.08 * (mixed_experts.T @ error + 1e-4 * task_heads)
+            latent_gradient = (error @ task_heads.T) * gate_prob
+            experts -= 0.03 * (batch.T @ latent_gradient + 1e-4 * experts)
+            gate_gradient = latent_gradient * latent
+            gate -= 0.01 * (batch.T @ (gate_prob * (gate_gradient - (gate_gradient * gate_prob).sum(axis=1, keepdims=True))) + 1e-4 * gate)
+    return experts, task_heads, gate
+
+
+def ple_predict(Z, experts, task_heads, gate):
+    latent = Z @ experts
+    gate_logits = np.clip(Z @ gate, -12, 12)
+    gate_prob = np.exp(gate_logits - gate_logits.max(axis=1, keepdims=True))
+    gate_prob /= gate_prob.sum(axis=1, keepdims=True)
+    return (latent * gate_prob) @ task_heads
 
 
 def auxiliary_fit(X, targets, mean, scale, epochs=1):
@@ -275,18 +314,23 @@ def run(args):
     mean, scale, weights = pairwise_fit(
         Xtr, ytr, utr, epochs=args.epochs, kit_dir=args.kit_dir,
         valid_users=uva, valid_labels=yva, valid_features=diagnostic_Zva, verbose=args.verbose,
+        l2=args.pairwise_l2, hard_negative=not args.uniform_negatives,
     )
     auxiliary_heads = auxiliary_fit(Xtr, atr, mean, scale)
+    ple_experts, ple_heads, ple_gate = ple_fit(Xtr, atr, mean, scale)
     Ztr, Zva, Zte = (Xtr - mean) / scale, (Xva - mean) / scale, (Xte - mean) / scale
     auxiliary_mix = np.asarray([0.15, 0.15, 0.2, 0.15, 0.15, -0.2], dtype=np.float32)
     auxiliary_valid = Zva @ auxiliary_heads @ auxiliary_mix
     auxiliary_test = Zte @ auxiliary_heads @ auxiliary_mix
+    ple_valid = ple_predict(Zva, ple_experts, ple_heads, ple_gate) @ auxiliary_mix
+    ple_test = ple_predict(Zte, ple_experts, ple_heads, ple_gate) @ auxiliary_mix
 
     candidates = {
         "multi_behavior": 0.25 * Zva[:, 0] + 0.75 * Zva[:, 1] + 0.25 * Zva[:, 2] + 0.75 * Zva[:, 3] + auxiliary_valid,
         "time_decay": 0.25 * Zva[:, 0] + 0.25 * Zva[:, 2] + 1.0 * Zva[:, 4] + 0.9 * Zva[:, 5],
         "pairwise_ranking": Zva @ weights,
         "auxiliary_multitask": auxiliary_valid,
+        "ple_multitask": ple_valid,
         "retrieval_then_rank": 0.35 * (0.6 * Zva[:, 0] + 0.4 * Zva[:, 4]) + 0.4 * (Zva @ weights) + 0.25 * auxiliary_valid,
     }
     tuned = tune_feature_blend(Zva, uva, yva, args.kit_dir)
@@ -302,6 +346,9 @@ def run(args):
     custom_scale = custom_valid.std() + 1e-6
     candidates["fm_baseline"] = fm_valid
     candidates["fm_plus_autoscale"] = 0.75 * fm_valid + 0.25 * ((custom_valid - custom_mean) / custom_scale)
+    ple_mean = ple_valid.mean()
+    ple_scale = ple_valid.std() + 1e-6
+    candidates["fm_plus_ple"] = 0.75 * fm_valid + 0.25 * ((ple_valid - ple_mean) / ple_scale)
     valid_results = {name: evaluate(args.kit_dir, uva, yva, score) for name, score in candidates.items()}
     raw_winner = max(valid_results, key=lambda name: valid_results[name]["primary"])
     fm_primary = valid_results["fm_baseline"]["primary"]
@@ -312,10 +359,12 @@ def run(args):
         "time_decay": 0.25 * Zte[:, 0] + 0.25 * Zte[:, 2] + 1.0 * Zte[:, 4] + 0.9 * Zte[:, 5],
         "pairwise_ranking": Zte @ weights,
         "auxiliary_multitask": auxiliary_test,
+        "ple_multitask": ple_test,
         "retrieval_then_rank": 0.35 * (0.6 * Zte[:, 0] + 0.4 * Zte[:, 4]) + 0.4 * (Zte @ weights) + 0.25 * auxiliary_test,
         "validation_tuned_blend": Zte @ tuned["weights"],
         "fm_baseline": fm_test,
         "fm_plus_autoscale": 0.75 * fm_test + 0.25 * ((custom_test - custom_mean) / custom_scale),
+        "fm_plus_ple": 0.75 * fm_test + 0.25 * ((ple_test - ple_mean) / ple_scale),
     }
     test_result = evaluate(args.kit_dir, ute, yte, test_scores[winner])
     return {
@@ -340,5 +389,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--fm-epochs", type=int, default=11)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--pairwise-l2", type=float, default=1e-4)
+    parser.add_argument("--uniform-negatives", action="store_true")
     args = parser.parse_args()
     print(json.dumps(run(args)))

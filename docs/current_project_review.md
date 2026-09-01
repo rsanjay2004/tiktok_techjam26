@@ -49,7 +49,7 @@ That distinction matters. Judges will reward the idea only if it connects to rea
    - The panel now reads only the persisted benchmark report and displays measured candidates.
 
 3. **The current challengers do not improve FM**
-   - Six challenger ideas were evaluated on validation and all failed the `0.002` promotion margin.
+   - Nine challenger variants, including PLE multitask variants, were evaluated on validation and all failed the `0.002` promotion margin.
    - The current best model is plain `fm_baseline`, with test primary `0.5953`.
 
 4. **Pairwise ranking needs diagnosis**
