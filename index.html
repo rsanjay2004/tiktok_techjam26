@@ -58,6 +58,7 @@ We need an autonomous system that reviews agent run logs, detects failures or po
             </div>
             <span id="agent-source" class="source-badge">Waiting</span>
           </div>
+          <div id="provider-runs" class="provider-runs" aria-label="Configured AI providers"></div>
           <div id="pipeline-stages" class="pipeline-stages" aria-label="Specialized model pipeline"></div>
           <div class="requirement-grid">
             <article>
@@ -110,10 +111,10 @@ We need an autonomous system that reviews agent run logs, detects failures or po
         <section class="loop-panel">
           <div class="panel-heading">
             <div>
-              <h2>Autonomous improvement loop</h2>
-              <p id="loop-summary">Run a bounded research loop that proposes experiments, evaluates metrics, and keeps only useful changes.</p>
+              <h2>Autonomous planning loop</h2>
+              <p id="loop-summary">This planning view shows candidate experiments. Measured GAUC and nDCG results come from the benchmark below.</p>
             </div>
-            <button id="loop-button" type="button">Run loop</button>
+            <button id="loop-button" type="button">Show benchmark</button>
           </div>
           <div class="metrics-grid">
             <article>
@@ -133,9 +134,13 @@ We need an autonomous system that reviews agent run logs, detects failures or po
               <p>manual interventions</p>
             </article>
           </div>
-          <div id="iteration-log" class="iteration-log" aria-label="Autonomous iteration log"></div>
+          <div class="benchmark-actions">
+            <button id="benchmark-button" type="button" class="secondary">Run KuaiRand benchmark</button>
+            <p id="benchmark-status" class="benchmark-status">Uses the real starter-kit evaluator when KuaiRand-Pure data is available.</p>
+          </div>
+          <div id="benchmark-results" class="benchmark-results" aria-live="polite"></div>
           <div class="tree-section">
-            <p class="card-label">AIDE-style solution tree</p>
+            <p class="card-label">Measured candidate comparison</p>
             <div id="solution-tree" class="solution-tree" aria-label="Solution tree search"></div>
           </div>
         </section>

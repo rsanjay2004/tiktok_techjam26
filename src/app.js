@@ -153,6 +153,7 @@ const analyzeButton = document.querySelector("#analyze-button");
 const modelStatus = document.querySelector("#model-status");
 const agentSummary = document.querySelector("#agent-summary");
 const agentSource = document.querySelector("#agent-source");
+const providerRuns = document.querySelector("#provider-runs");
 const requirementList = document.querySelector("#requirement-list");
 const trainingList = document.querySelector("#training-list");
 const trainingNote = document.querySelector("#training-note");
@@ -167,8 +168,10 @@ const bestPrimary = document.querySelector("#best-primary");
 const bestGauc = document.querySelector("#best-gauc");
 const bestNdcg = document.querySelector("#best-ndcg");
 const manualInterventions = document.querySelector("#manual-interventions");
-const iterationLog = document.querySelector("#iteration-log");
 const solutionTree = document.querySelector("#solution-tree");
+const benchmarkButton = document.querySelector("#benchmark-button");
+const benchmarkStatus = document.querySelector("#benchmark-status");
+const benchmarkResults = document.querySelector("#benchmark-results");
 
 let attachments = [];
 
@@ -363,6 +366,14 @@ function renderList(target, items, emptyText) {
 function renderAgentState(state, trainingCount) {
   agentSummary.textContent = state.summary;
   agentSource.textContent = state.source;
+  providerRuns.innerHTML = "";
+  (state.providerRuns || [{ id: "local", role: "fallback", status: "primary" }]).forEach((provider) => {
+    const chip = document.createElement("span");
+    chip.className = `provider-chip ${provider.status === "error" ? "failed" : provider.status === "ok" ? "ready" : "local"}`;
+    chip.textContent = `${provider.label || (provider.id === "local" ? "Local deterministic fallback" : provider.id)} · ${provider.role || provider.status}`;
+    if (provider.error) chip.title = provider.error;
+    providerRuns.appendChild(chip);
+  });
   renderPipelineStages(state.pipelineStages || defaultAgentState.pipelineStages);
   renderList(requirementList, state.requirements, "No requirements detected yet.");
   renderList(trainingList, state.trainingExamples, "No generated examples yet.");
@@ -572,57 +583,84 @@ async function analyze() {
 }
 
 function renderLoop(result) {
-  loopSummary.textContent = `${result.summary} ${result.convergence}`;
-  bestPrimary.textContent = result.best.primary.toFixed(4);
-  bestGauc.textContent = result.best.gauc.toFixed(4);
-  bestNdcg.textContent = result.best.ndcg.toFixed(4);
-  manualInterventions.textContent = String(result.manualInterventions);
-
-  iterationLog.innerHTML = "";
-  result.iterations.forEach((iteration) => {
-    const card = document.createElement("article");
-    card.className = `iteration-card ${iteration.decision === "keep" ? "kept" : "rejected"}`;
-
-    const head = document.createElement("div");
-    head.className = "iteration-head";
-    const title = document.createElement("h3");
-    title.textContent = `Iteration ${iteration.iteration}: ${iteration.model} (${iteration.action})`;
-    const decision = document.createElement("code");
-    decision.textContent = iteration.decision;
-    head.append(title, decision);
-
-    const hypothesis = document.createElement("p");
-    hypothesis.textContent = `Hypothesis: ${iteration.hypothesis}`;
-    const diff = document.createElement("p");
-    diff.textContent = `Change: ${iteration.diff}`;
-    const metrics = document.createElement("p");
-    metrics.textContent = `GAUC ${iteration.metrics.GAUC.toFixed(4)} | nDCG@5 ${iteration.metrics["nDCG@5"].toFixed(4)} | primary ${iteration.metrics.primary.toFixed(4)} | delta ${iteration.metrics.deltaPrimary.toFixed(4)}`;
-    const recovery = document.createElement("p");
-    recovery.textContent = `Recovery: ${iteration.recovery}`;
-    const branch = document.createElement("p");
-    branch.textContent = `Tree node: ${iteration.nodeId}, parent: ${iteration.parentId || "root"}`;
-
-    card.append(head, hypothesis, diff, metrics, recovery, branch);
-    iterationLog.appendChild(card);
-  });
-
   solutionTree.innerHTML = "";
-  result.solutionTree.forEach((node) => {
-    const card = document.createElement("article");
-    card.className = `tree-node ${node.id === result.bestNodeId ? "best" : ""}`;
-    const title = document.createElement("h3");
-    const parent = document.createElement("span");
-    const metric = document.createElement("p");
-    const note = document.createElement("p");
-
-    title.textContent = `${node.id}: ${node.action}`;
-    parent.textContent = `parent: ${node.parentId || "none"}`;
-    metric.textContent = `primary ${node.primary.toFixed(4)} | ${node.status}`;
-    note.textContent = node.name;
-
-    card.append(title, parent, metric, note);
-    solutionTree.appendChild(card);
+  const fm = result.candidates?.fm_baseline?.valid?.primary;
+  const winner = result.winner;
+  const winnerTest = Number(result.test?.primary);
+  const candidates = Object.entries(result.candidates || {}).sort(([, a], [, b]) => b.valid.primary - a.valid.primary);
+  const challengerCount = candidates.filter(([name]) => name !== "fm_baseline").filter(([, value]) => value.valid.primary >= fm + Number(result.promotion_margin || 0)).length;
+  const banner = document.createElement("p");
+  banner.className = "benchmark-decision";
+  banner.textContent = `${challengerCount} of ${Math.max(candidates.length - 1, 0)} candidates beat the FM baseline by the required ${Number(result.promotion_margin || 0).toFixed(3)} margin. Current best model: ${winner === "fm_baseline" ? "FM baseline" : winner} (test primary ${winnerTest.toFixed(4)}).`;
+  solutionTree.appendChild(banner);
+  const rule = document.createElement("p");
+  rule.className = "benchmark-rule";
+  rule.textContent = `Promotion rule: ${result.promotion_rule}`;
+  solutionTree.appendChild(rule);
+  const table = document.createElement("table");
+  table.className = "benchmark-table candidate-table";
+  table.innerHTML = "<thead><tr><th>Name</th><th>Valid Primary</th><th>Delta vs FM</th><th>Decision</th></tr></thead>";
+  const body = document.createElement("tbody");
+  candidates.forEach(([name, value]) => {
+    const row = document.createElement("tr");
+    if (name === winner) row.className = "winner-row";
+    const delta = value.valid.primary - fm;
+    const label = name === "fm_baseline" ? "FM baseline" : name;
+    [label, value.valid.primary.toFixed(4), `${delta >= 0 ? "+" : ""}${delta.toFixed(4)}`, name === winner ? "Accepted" : "Rejected"].forEach((item) => {
+      const cell = document.createElement("td");
+      cell.textContent = item;
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
   });
+  table.appendChild(body);
+  solutionTree.appendChild(table);
+  bestPrimary.textContent = result.candidates?.[winner]?.valid?.primary?.toFixed(4) || "-";
+  bestGauc.textContent = result.candidates?.[winner]?.valid?.GAUC?.toFixed(4) || "-";
+  bestNdcg.textContent = result.candidates?.[winner]?.valid?.["nDCG@5"]?.toFixed(4) || "-";
+  manualInterventions.textContent = "0";
+  loopSummary.textContent = "Real benchmark candidates loaded from evaluate.py. No metric is synthesized in the dashboard.";
+}
+
+function parseMeasuredMetrics(item) {
+  const matches = [...String(item.log || "").matchAll(/test\s+GAUC\s+([0-9.]+)\s+\|\s+nDCG@5\s+([0-9.]+)\s+\|\s+primary\s+([0-9.]+)/g)];
+  if (matches.length) return { gauc: Number(matches.at(-1)[1]), ndcg: Number(matches.at(-1)[2]), primary: Number(matches.at(-1)[3]) };
+  if (item.model === "autoscale") {
+    try {
+      const report = JSON.parse(String(item.log || "").slice(String(item.log || "").indexOf("{")));
+      return { gauc: report.test?.GAUC, ndcg: report.test?.["nDCG@5"], primary: report.test?.primary, winner: report.winner };
+    } catch { return null; }
+  }
+  return null;
+}
+
+function renderBenchmarkResults(result) {
+  benchmarkResults.innerHTML = "";
+  const heading = document.createElement("p");
+  heading.className = "benchmark-result-heading";
+  heading.textContent = "Measured benchmark results";
+  benchmarkResults.appendChild(heading);
+  const table = document.createElement("table");
+  table.className = "benchmark-table";
+  table.innerHTML = "<thead><tr><th>Run</th><th>GAUC</th><th>nDCG@5</th><th>Primary</th><th>Decision</th></tr></thead>";
+  const body = document.createElement("tbody");
+  result.models.forEach((item) => {
+    const metrics = parseMeasuredMetrics(item);
+    if (!metrics) return;
+    const row = document.createElement("tr");
+    [item.model, metrics.gauc?.toFixed(4) || "-", metrics.ndcg?.toFixed(4) || "-", metrics.primary?.toFixed(4) || "-", item.model === "autoscale" ? `Winner: ${metrics.winner || "unknown"}` : "Measured"].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
+  });
+  table.appendChild(body);
+  benchmarkResults.appendChild(table);
+  const note = document.createElement("p");
+  note.className = "benchmark-note";
+  note.textContent = "The official evaluator is the source of truth. Challengers are promoted only when validation improves by the configured margin.";
+  benchmarkResults.appendChild(note);
 }
 
 async function runLoop() {
@@ -637,6 +675,34 @@ async function runLoop() {
   } finally {
     loopButton.disabled = false;
     loopButton.textContent = "Run loop";
+  }
+}
+
+async function runBenchmark() {
+  benchmarkButton.disabled = true;
+  benchmarkStatus.textContent = "Running the KuaiRand starter-kit evaluator...";
+  try {
+    const response = await fetch("/api/run-benchmark", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const result = await response.json();
+    if (result.status === "missing_dataset") {
+      benchmarkStatus.textContent = "Dataset not found. Add KuaiRand-Pure/data, then run this benchmark again.";
+    } else if (result.status === "completed") {
+      const models = result.models.map((item) => `${item.model}: ${item.seconds}s`).join(" | ");
+      benchmarkStatus.textContent = `Real starter-kit runs completed: ${models}.`;
+      const reportResponse = await fetch("/api/run-autonomous-loop", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const report = await reportResponse.json();
+      if (report.status === "completed") renderLoop(report);
+    } else {
+      benchmarkStatus.textContent = result.message || "Benchmark could not complete.";
+    }
+  } catch (error) {
+    benchmarkStatus.textContent = error.message;
+  } finally {
+    benchmarkButton.disabled = false;
   }
 }
 
@@ -671,5 +737,6 @@ document.querySelector("#sample-button").addEventListener("click", () => {
   analyze();
 });
 loopButton.addEventListener("click", runLoop);
+benchmarkButton.addEventListener("click", runBenchmark);
 
 analyze();

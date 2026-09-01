@@ -1,8 +1,12 @@
 # Autonomous ML Research Triage
 
-This project implements **Problem 2: Lightweight Classifier + Dashboard** as an autonomous machine learning research helper.
+This project implements a requirement-triage interface and a KuaiRand-Pure autonomous recommender research benchmark.
 
-The app uses an optional OpenAI model as a requirement analyst. It extracts the user's ML requirements, generates synthetic labeled training examples, retrains a small multinomial Naive Bayes classifier, explains the prediction, compares category scores, and creates an experiment plan.
+## Scope
+
+This submission targets the KuaiRand-Pure recommendation-system track. The requirement classifier is a supporting interface that translates a research brief into candidate experiments; the official KuaiRand pipeline remains the source of truth for training, evaluation, and model selection.
+
+The app uses an optional multi-provider AI layer to interpret research requirements, while the Python pipeline performs the real KuaiRand recommendation experiments. The official evaluator, not an LLM or the dashboard planning demo, determines benchmark quality.
 
 ## Why this project works for a demo
 
@@ -14,10 +18,11 @@ The app uses an optional OpenAI model as a requirement analyst. It extracts the 
 ## How it works
 
 1. The user enters a machine learning problem statement.
-2. The backend calls OpenAI Structured Outputs when `OPENAI_API_KEY` is available.
-3. The requirement analyst returns a category, requirements, features, generated training examples, and next actions.
-4. The browser adds those generated examples to the seed dataset.
-5. The lightweight classifier retrains immediately and scores the user's problem.
+2. The backend calls every configured provider using the same analysis contract.
+3. The first successful provider is primary; other successful providers are reviewers and are shown in the dashboard.
+4. The requirement analyst returns a category, requirements, features, generated training examples, and next actions.
+5. The browser adds those generated examples to the seed dataset.
+6. The lightweight classifier retrains immediately and scores the user's problem.
 
 ## Research categories
 
@@ -48,6 +53,15 @@ You can also choose a model:
 OPENAI_API_KEY=your-api-key OPENAI_MODEL=gpt-4.1-mini npm start
 ```
 
+Optional independent providers:
+
+```bash
+ANTHROPIC_API_KEY=your-api-key ANTHROPIC_MODEL=claude-3-5-haiku-latest npm start
+GEMINI_API_KEY=your-api-key GEMINI_MODEL=gemini-2.0-flash npm start
+```
+
+Use all providers together by exporting all three variables before `npm start`. API keys stay on the server and are never sent to the browser. Provider responses only plan and review; the Python KuaiRand evaluator decides whether a trained recommender actually improved.
+
 ## Suggested pitch
 
 Research teams often lose time deciding which ML method best fits a vague problem. This project acts as an autonomous first-pass research triage model. An OpenAI model detects the requirement, the app automatically retrains a lightweight classifier, and the dashboard turns the raw statement into a classified ML direction, supporting evidence, and a practical experiment plan.
@@ -62,12 +76,29 @@ Research teams often lose time deciding which ML method best fits a vague proble
 
 ## Literature-backed competition strategy
 
-See [docs/literature_strategy.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/literature_strategy.md) for the recommended pivot into **AutoScaleRec**, an autonomous scalable recommender research agent for KuaiRand-Pure.
+See [docs/literature_strategy.md](docs/literature_strategy.md) for the recommended pivot into **AutoScaleRec**, an autonomous scalable recommender research agent for KuaiRand-Pure.
 
-See [docs/kuairand_starter_kit_test_report.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/kuairand_starter_kit_test_report.md) for the starter-kit zip smoke test results.
+See [docs/kuairand_starter_kit_test_report.md](docs/kuairand_starter_kit_test_report.md) for the starter-kit zip smoke test results.
 
-See [docs/multi_model_framework.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/multi_model_framework.md) for the four-model autonomous learning framework.
+See [docs/multi_model_framework.md](docs/multi_model_framework.md) for the four-model autonomous learning framework.
 
-See [docs/current_project_review.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/current_project_review.md) for a critical review of what is strong today and what still needs to become real benchmark work.
+See [docs/current_project_review.md](docs/current_project_review.md) for a critical review of the measured results and remaining work.
 
-See [docs/aide_integration_plan.md](/Users/livelysan/Documents/ChatGPT/tiktok techjam/docs/aide_integration_plan.md) for how the project adapts AIDE-style solution-space tree search.
+See [docs/aide_integration_plan.md](docs/aide_integration_plan.md) for how the project adapts AIDE-style solution-space tree search.
+
+See [docs/provider_roles.md](docs/provider_roles.md) for the multi-provider routing and continuous-learning policy.
+
+## Real KuaiRand benchmark bridge
+
+The dashboard now includes a **Run KuaiRand benchmark** action. It invokes `kuairand_runner.py`, which delegates data loading and evaluation to the official starter-kit scripts and writes the result to `runs/benchmark_report.json`.
+
+The starter kit and full dataset must be available locally. From the project root:
+
+```bash
+export KUAI_DATA_DIR=/path/to/KuaiRand-Pure/data
+export KUAI_KIT_DIR=/path/to/kuairand-starter-kit
+export KUAI_PYTHON=/path/to/python-with-numpy
+npm start
+```
+
+The dashboard separates the planning demonstration from measured benchmark output and displays the real model scores and selected winner directly.
