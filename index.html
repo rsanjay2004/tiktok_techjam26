@@ -111,8 +111,8 @@ We need an autonomous system that reviews agent run logs, detects failures or po
         <section class="loop-panel">
           <div class="panel-heading">
             <div>
-              <h2>Autonomous improvement loop</h2>
-              <p id="loop-summary">Run a bounded research loop that proposes experiments, evaluates metrics, and keeps only useful changes.</p>
+              <h2>Autonomous planning loop</h2>
+              <p id="loop-summary">This planning view shows candidate experiments. Measured GAUC and nDCG results come from the benchmark below.</p>
             </div>
             <button id="loop-button" type="button">Run loop</button>
           </div>
@@ -143,6 +143,7 @@ We need an autonomous system that reviews agent run logs, detects failures or po
             <button id="benchmark-button" type="button" class="secondary">Run KuaiRand benchmark</button>
             <p id="benchmark-status" class="benchmark-status">Uses the real starter-kit evaluator when KuaiRand-Pure data is available.</p>
           </div>
+          <div id="benchmark-results" class="benchmark-results" aria-live="polite"></div>
           <div id="iteration-log" class="iteration-log" aria-label="Autonomous iteration log"></div>
           <div class="tree-section">
             <p class="card-label">AIDE-style solution tree</p>

@@ -1,8 +1,10 @@
 # Critical Review of the Current Project
 
-## Honest status
+## Updated honest status (September 2026)
 
-The current project is a strong **concept demo** for an autonomous multi-model ML research framework. It is not yet a full Track 2 benchmark solution.
+The project now has a real KuaiRand-Pure benchmark path and a multi-provider requirement-analysis layer. The dashboard planning loop is intentionally a scripted planning demonstration; it must not be confused with measured benchmark experiments.
+
+The latest full-data run evaluated 1,141,112 training rows, 124,909 validation rows, and 170,588 test rows. FM remained the selected model with test primary `0.5953`, GAUC `0.6621`, and nDCG@5 `0.5286`. All current challengers were rejected because they did not beat FM on validation.
 
 That distinction matters. Judges will reward the idea only if it connects to real KuaiRand-Pure training, GAUC/nDCG@5 evaluation, iteration logs, and final submission files.
 
@@ -43,9 +45,9 @@ That distinction matters. Judges will reward the idea only if it connects to rea
    - It does not yet load user/video interaction logs.
    - It does not produce a real recommender submission.
 
-2. **The autonomous loop metrics are framework-demo estimates**
-   - The loop currently simulates metric changes to show how the system works.
-   - This is useful for explaining the framework, but it cannot be presented as benchmark evidence.
+2. **The dashboard planning loop is not the benchmark**
+   - Its fixed metric values illustrate solution-tree control flow only.
+   - The UI labels it as a planning demonstration and shows measured results separately.
 
 3. **Feature engineering is not implemented on the real dataset yet**
    - The system talks about user history, time decay, multi-behavior satisfaction, and candidate retrieval.
@@ -55,15 +57,15 @@ That distinction matters. Judges will reward the idea only if it connects to rea
    - Track 2 expects up to 50 iterations or stopping after no meaningful improvement.
    - The current demo loop is bounded for explanation, not a real six-hour benchmark run.
 
-5. **No final checkpoint/submission from our model**
-   - The starter kit smoke test proves the harness works.
-   - It does not prove our model beats the official FM baseline.
+5. **No challenger improvement yet**
+   - The real harness proves the benchmark path works.
+   - It does not prove the current custom model beats the official FM baseline; the selector correctly retains FM.
 
 ## What to build next
 
-### Priority 1: Real KuaiRand benchmark path
+### Priority 1: Diagnose and improve the real challenger
 
-Add the starter kit into the repo and wire:
+The benchmark path is now wired. The highest-value next work is diagnosing the large pairwise-ranking regression and running controlled ablations:
 
 ```text
 data.py -> feature builder -> model trainer -> evaluate.py -> submit.py

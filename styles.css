@@ -311,6 +311,13 @@ textarea:focus {
 .provider-chip.failed { border-color: #f3a4ad; color: #b4233b; }
 .provider-chip.local { border-color: #e5c66c; color: #8a6500; }
 
+.benchmark-results { margin-top: 1rem; overflow-x: auto; }
+.benchmark-result-heading, .benchmark-note { color: var(--muted); font-size: 0.82rem; font-weight: 800; }
+.benchmark-table { border-collapse: collapse; min-width: 640px; width: 100%; }
+.benchmark-table th, .benchmark-table td { border-bottom: 1px solid var(--line); padding: 0.7rem 0.55rem; text-align: left; }
+.benchmark-table th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
+.benchmark-table td { color: var(--ink); font-variant-numeric: tabular-nums; }
+
 .agent-panel {
   margin-top: 1rem;
 }

@@ -1,8 +1,8 @@
 # Autonomous ML Research Triage
 
-This project implements **Problem 2: Lightweight Classifier + Dashboard** as an autonomous machine learning research helper.
+This project implements a requirement-triage interface and a KuaiRand-Pure autonomous recommender research benchmark.
 
-The app uses an optional multi-provider AI layer as a requirement analyst. OpenAI, Claude, and Gemini can each fill the same structured-analysis contract. The first configured provider is the primary analyst; other configured providers independently review the same request. The browser then generates synthetic labeled training examples and retrains a small multinomial Naive Bayes classifier.
+The app uses an optional multi-provider AI layer to interpret research requirements, while the Python pipeline performs the real KuaiRand recommendation experiments. The official evaluator, not an LLM or the dashboard planning demo, determines benchmark quality.
 
 ## Why this project works for a demo
 
@@ -97,4 +97,4 @@ export KUAI_PYTHON=/path/to/python-with-numpy
 npm start
 ```
 
-The dashboard will report a missing-dataset state instead of showing simulated loop metrics as benchmark results. The autonomous improvement loop remains a controlled planning demo until each experiment is connected to a real KuaiRand training configuration.
+The dashboard separates the planning demonstration from measured benchmark output and displays the real model scores and selected winner directly.

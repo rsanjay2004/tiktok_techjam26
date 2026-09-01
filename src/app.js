@@ -172,6 +172,7 @@ const iterationLog = document.querySelector("#iteration-log");
 const solutionTree = document.querySelector("#solution-tree");
 const benchmarkButton = document.querySelector("#benchmark-button");
 const benchmarkStatus = document.querySelector("#benchmark-status");
+const benchmarkResults = document.querySelector("#benchmark-results");
 const targetPrimary = document.querySelector("#target-primary");
 const maxIterations = document.querySelector("#max-iterations");
 const maxNoImprove = document.querySelector("#max-no-improve");
@@ -591,7 +592,7 @@ async function analyze() {
 }
 
 function renderLoop(result) {
-  loopSummary.textContent = `${result.summary} ${result.convergence}`;
+  loopSummary.textContent = `Planning demonstration only: ${result.convergence} Measured scores are shown by Run KuaiRand benchmark.`;
   bestPrimary.textContent = result.best.primary.toFixed(4);
   bestGauc.textContent = result.best.gauc.toFixed(4);
   bestNdcg.textContent = result.best.ndcg.toFixed(4);
@@ -644,6 +645,47 @@ function renderLoop(result) {
   });
 }
 
+function parseMeasuredMetrics(item) {
+  const matches = [...String(item.log || "").matchAll(/test\s+GAUC\s+([0-9.]+)\s+\|\s+nDCG@5\s+([0-9.]+)\s+\|\s+primary\s+([0-9.]+)/g)];
+  if (matches.length) return { gauc: Number(matches.at(-1)[1]), ndcg: Number(matches.at(-1)[2]), primary: Number(matches.at(-1)[3]) };
+  if (item.model === "autoscale") {
+    try {
+      const report = JSON.parse(String(item.log || "").slice(String(item.log || "").indexOf("{")));
+      return { gauc: report.test?.GAUC, ndcg: report.test?.["nDCG@5"], primary: report.test?.primary, winner: report.winner };
+    } catch { return null; }
+  }
+  return null;
+}
+
+function renderBenchmarkResults(result) {
+  benchmarkResults.innerHTML = "";
+  const heading = document.createElement("p");
+  heading.className = "benchmark-result-heading";
+  heading.textContent = "Measured benchmark results";
+  benchmarkResults.appendChild(heading);
+  const table = document.createElement("table");
+  table.className = "benchmark-table";
+  table.innerHTML = "<thead><tr><th>Run</th><th>GAUC</th><th>nDCG@5</th><th>Primary</th><th>Decision</th></tr></thead>";
+  const body = document.createElement("tbody");
+  result.models.forEach((item) => {
+    const metrics = parseMeasuredMetrics(item);
+    if (!metrics) return;
+    const row = document.createElement("tr");
+    [item.model, metrics.gauc?.toFixed(4) || "-", metrics.ndcg?.toFixed(4) || "-", metrics.primary?.toFixed(4) || "-", item.model === "autoscale" ? `Winner: ${metrics.winner || "unknown"}` : "Measured"].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
+  });
+  table.appendChild(body);
+  benchmarkResults.appendChild(table);
+  const note = document.createElement("p");
+  note.className = "benchmark-note";
+  note.textContent = "The official evaluator is the source of truth. Challengers are promoted only when validation improves by the configured margin.";
+  benchmarkResults.appendChild(note);
+}
+
 async function runLoop() {
   loopButton.disabled = true;
   loopButton.textContent = "Running...";
@@ -673,7 +715,8 @@ async function runBenchmark() {
       benchmarkStatus.textContent = "Dataset not found. Add KuaiRand-Pure/data, then run this benchmark again.";
     } else if (result.status === "completed") {
       const models = result.models.map((item) => `${item.model}: ${item.seconds}s`).join(" | ");
-      benchmarkStatus.textContent = `Real starter-kit runs completed: ${models}. See runs/benchmark_report.json.`;
+      benchmarkStatus.textContent = `Real starter-kit runs completed: ${models}.`;
+      renderBenchmarkResults(result);
     } else {
       benchmarkStatus.textContent = result.message || "Benchmark could not complete.";
     }
