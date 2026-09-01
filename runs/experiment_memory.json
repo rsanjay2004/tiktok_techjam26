@@ -1,0 +1,20 @@
+{
+  "best_candidate": "fm_baseline",
+  "best_validation_primary": 0.6014695167541504,
+  "failed_candidates": [
+    "multi_behavior",
+    "time_decay",
+    "pairwise_ranking",
+    "pairwise_uniform",
+    "auxiliary_multitask",
+    "ple_multitask",
+    "retrieval_then_rank",
+    "randomized_exposure_item",
+    "validation_tuned_blend",
+    "fm_plus_autoscale",
+    "fm_plus_ple"
+  ],
+  "next_experiment": "fm_plus_ple",
+  "promotion_margin": 0.002,
+  "updated_at_epoch": 1788232436.1975858
+}
