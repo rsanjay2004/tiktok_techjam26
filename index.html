@@ -58,6 +58,7 @@ We need an autonomous system that reviews agent run logs, detects failures or po
             </div>
             <span id="agent-source" class="source-badge">Waiting</span>
           </div>
+          <div id="provider-runs" class="provider-runs" aria-label="Configured AI providers"></div>
           <div id="pipeline-stages" class="pipeline-stages" aria-label="Specialized model pipeline"></div>
           <div class="requirement-grid">
             <article>
@@ -115,6 +116,11 @@ We need an autonomous system that reviews agent run logs, detects failures or po
             </div>
             <button id="loop-button" type="button">Run loop</button>
           </div>
+          <div class="loop-controls" aria-label="Autonomous loop controls">
+            <label>Target primary <input id="target-primary" type="number" min="0" max="1" step="0.0001" value="0.6500" /></label>
+            <label>Max iterations <input id="max-iterations" type="number" min="1" max="50" step="1" value="5" /></label>
+            <label>Patience <input id="max-no-improve" type="number" min="1" max="10" step="1" value="3" /></label>
+          </div>
           <div class="metrics-grid">
             <article>
               <span id="best-primary">-</span>
@@ -132,6 +138,10 @@ We need an autonomous system that reviews agent run logs, detects failures or po
               <span id="manual-interventions">-</span>
               <p>manual interventions</p>
             </article>
+          </div>
+          <div class="benchmark-actions">
+            <button id="benchmark-button" type="button" class="secondary">Run KuaiRand benchmark</button>
+            <p id="benchmark-status" class="benchmark-status">Uses the real starter-kit evaluator when KuaiRand-Pure data is available.</p>
           </div>
           <div id="iteration-log" class="iteration-log" aria-label="Autonomous iteration log"></div>
           <div class="tree-section">

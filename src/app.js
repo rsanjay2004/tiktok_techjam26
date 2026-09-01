@@ -153,6 +153,7 @@ const analyzeButton = document.querySelector("#analyze-button");
 const modelStatus = document.querySelector("#model-status");
 const agentSummary = document.querySelector("#agent-summary");
 const agentSource = document.querySelector("#agent-source");
+const providerRuns = document.querySelector("#provider-runs");
 const requirementList = document.querySelector("#requirement-list");
 const trainingList = document.querySelector("#training-list");
 const trainingNote = document.querySelector("#training-note");
@@ -169,6 +170,11 @@ const bestNdcg = document.querySelector("#best-ndcg");
 const manualInterventions = document.querySelector("#manual-interventions");
 const iterationLog = document.querySelector("#iteration-log");
 const solutionTree = document.querySelector("#solution-tree");
+const benchmarkButton = document.querySelector("#benchmark-button");
+const benchmarkStatus = document.querySelector("#benchmark-status");
+const targetPrimary = document.querySelector("#target-primary");
+const maxIterations = document.querySelector("#max-iterations");
+const maxNoImprove = document.querySelector("#max-no-improve");
 
 let attachments = [];
 
@@ -363,6 +369,14 @@ function renderList(target, items, emptyText) {
 function renderAgentState(state, trainingCount) {
   agentSummary.textContent = state.summary;
   agentSource.textContent = state.source;
+  providerRuns.innerHTML = "";
+  (state.providerRuns || [{ id: "local", role: "fallback", status: "primary" }]).forEach((provider) => {
+    const chip = document.createElement("span");
+    chip.className = `provider-chip ${provider.status === "error" ? "failed" : provider.status === "ok" ? "ready" : "local"}`;
+    chip.textContent = `${provider.label || (provider.id === "local" ? "Local deterministic fallback" : provider.id)} · ${provider.role || provider.status}`;
+    if (provider.error) chip.title = provider.error;
+    providerRuns.appendChild(chip);
+  });
   renderPipelineStages(state.pipelineStages || defaultAgentState.pipelineStages);
   renderList(requirementList, state.requirements, "No requirements detected yet.");
   renderList(trainingList, state.trainingExamples, "No generated examples yet.");
@@ -461,7 +475,12 @@ async function fetchAutonomousLoop(text) {
   const response = await fetch("/api/run-autonomous-loop", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ problem: text }),
+    body: JSON.stringify({
+      problem: text,
+      targetPrimary: Number(targetPrimary.value),
+      maxIterations: Number(maxIterations.value),
+      maxNoImprove: Number(maxNoImprove.value),
+    }),
   });
 
   if (!response.ok) {
@@ -640,6 +659,31 @@ async function runLoop() {
   }
 }
 
+async function runBenchmark() {
+  benchmarkButton.disabled = true;
+  benchmarkStatus.textContent = "Running the KuaiRand starter-kit evaluator...";
+  try {
+    const response = await fetch("/api/run-benchmark", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const result = await response.json();
+    if (result.status === "missing_dataset") {
+      benchmarkStatus.textContent = "Dataset not found. Add KuaiRand-Pure/data, then run this benchmark again.";
+    } else if (result.status === "completed") {
+      const models = result.models.map((item) => `${item.model}: ${item.seconds}s`).join(" | ");
+      benchmarkStatus.textContent = `Real starter-kit runs completed: ${models}. See runs/benchmark_report.json.`;
+    } else {
+      benchmarkStatus.textContent = result.message || "Benchmark could not complete.";
+    }
+  } catch (error) {
+    benchmarkStatus.textContent = error.message;
+  } finally {
+    benchmarkButton.disabled = false;
+  }
+}
+
 const model = trainNaiveBayes(baseTrainingData);
 
 model.labels.forEach((label) => {
@@ -671,5 +715,6 @@ document.querySelector("#sample-button").addEventListener("click", () => {
   analyze();
 });
 loopButton.addEventListener("click", runLoop);
+benchmarkButton.addEventListener("click", runBenchmark);
 
 analyze();
