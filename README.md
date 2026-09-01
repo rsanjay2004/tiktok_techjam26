@@ -62,10 +62,6 @@ GEMINI_API_KEY=your-api-key GEMINI_MODEL=gemini-2.0-flash npm start
 
 Use all providers together by exporting all three variables before `npm start`. API keys stay on the server and are never sent to the browser. Provider responses only plan and review; the Python KuaiRand evaluator decides whether a trained recommender actually improved.
 
-## Suggested pitch
-
-Research teams often lose time deciding which ML method best fits a vague problem. This project acts as an autonomous first-pass research triage model. An OpenAI model detects the requirement, the app automatically retrains a lightweight classifier, and the dashboard turns the raw statement into a classified ML direction, supporting evidence, and a practical experiment plan.
-
 ## Future improvements
 
 - Replace the small seed dataset with real labeled hackathon examples.
